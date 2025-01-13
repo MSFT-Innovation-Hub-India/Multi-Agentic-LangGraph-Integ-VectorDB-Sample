@@ -147,6 +147,45 @@ def run_dynamic_sql():
     cursor.close()
     connection.close()
 
+
+def run_feedback_vector_query():
+    connection = pyodbc.connect(
+        "Driver={ODBC Driver 18 for SQL Server};SERVER="
+        + az_db_server
+        + ";DATABASE="
+        + az_db_database
+        + ";UID="
+        + az_db_username
+        + ";PWD="
+        + az_db_password
+    )
+    cursor = connection.cursor()
+    
+    sentiment_query = "The customer was displeased with the overall service"
+    v_query = json.dumps(json.loads(str(get_embedding(sentiment_query)))),
+    
+    t_sql = ""
+    
+    # Call the stored procedure
+    stored_procedure = """
+    EXEC AnalyzeFeedback ?
+    """
+    cursor.execute(
+        stored_procedure,
+        (
+            v_query
+        ),
+    )
+    rows = cursor.fetchall()
+    print(rows)
+
+
+
+    # print('database call response has been parsed')
+    cursor.close()
+    connection.close()
+
+
 # call this function to run the code
 run_analyze_feedback()
 # run_dynamic_sql()
