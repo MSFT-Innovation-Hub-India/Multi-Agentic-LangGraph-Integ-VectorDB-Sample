@@ -1,4 +1,4 @@
-langgraph-0.2.56
+langgraph==0.2.74
 langsmith
 langchain-openai
 langchain_community
@@ -9,3 +9,4 @@ tavily-python
 pyodbc
 websockets
 azure-search-documents
+azure-identity

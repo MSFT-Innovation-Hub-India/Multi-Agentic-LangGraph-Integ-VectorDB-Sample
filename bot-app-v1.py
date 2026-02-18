@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 import os
 from langchain_openai import AzureChatOpenAI
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 import service_requests.db_tools as db_tools
 import service_requests.search_tools as search_tools
 
@@ -29,7 +30,6 @@ from IPython.display import display, Image
 
 load_dotenv()
 az_openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-az_openai_key = os.getenv("AZURE_OPENAI_KEY")
 az_openai_deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 az_openai_embedding_deployment_name = os.getenv(
     "AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME"
@@ -37,10 +37,13 @@ az_openai_embedding_deployment_name = os.getenv(
 az_api_type = os.getenv("API_TYPE")
 az_openai_version = os.getenv("API_VERSION")
 
+credential = DefaultAzureCredential()
+token_provider = get_bearer_token_provider(credential, "https://cognitiveservices.azure.com/.default")
+
 llm = AzureChatOpenAI(
     azure_endpoint=az_openai_endpoint,
     azure_deployment=az_openai_deployment_name,
-    api_key=az_openai_key,
+    azure_ad_token_provider=token_provider,
     openai_api_type=az_api_type,
     api_version=az_openai_version,
 )

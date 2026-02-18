@@ -96,6 +96,38 @@ To analyze customer feedback, run:
 python analyze_feedback.py
 ```
 
+### Vector Search with Managed Identity
+
+Use the new CLI flow to generate embeddings with Azure OpenAI and run vector similarity search in Azure SQL using managed identity.
+
+1. Activate virtual environment:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+2. Run vector search using the PowerShell wrapper:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\run-vector-search.ps1 -QueryText "timely delivery issue" -Top 10
+```
+
+3. Optional filters:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\run-vector-search.ps1 -QueryText "timely delivery issue" -MaxRating 3 -DistanceThreshold 0.5 -Top 10
+```
+
+4. Direct Python command (alternative):
+
+```powershell
+python scripts/vector_feedback_search.py --query-text "timely delivery issue" --max-rating 3 --distance-threshold 0.5 --top 10
+```
+
+Notes:
+- Run commands exactly as plain text in terminal (do not include markdown link formats like `[file](url)`).
+- The script reads configuration from `.env` and uses `DefaultAzureCredential` for both Azure OpenAI and Azure SQL.
+
 ### Database Setup
 
 To set up the database, execute the SQL scripts in the scripts directory in the following order:

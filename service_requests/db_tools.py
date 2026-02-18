@@ -1,4 +1,5 @@
 import pyodbc
+import struct
 from dotenv import load_dotenv
 import os
 import requests
@@ -6,21 +7,36 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 import json
 import traceback
+from azure.identity import DefaultAzureCredential
+
 load_dotenv()
 
 az_db_server = os.getenv("az_db_server")
 az_db_database = os.getenv("az_db_database")
-az_db_username = os.getenv("az_db_username")
-az_db_password = os.getenv("az_db_password")
 
 az_openai_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-az_openai_key = os.getenv("AZURE_OPENAI_API_KEY")
 az_openai_deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 az_openai_embedding_deployment_name = os.getenv(
     "AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME"
 )
 az_api_type = os.getenv("API_TYPE")
 az_openai_version = os.getenv("API_VERSION")
+
+credential = DefaultAzureCredential()
+
+
+def get_sql_connection():
+    """Create a pyodbc connection to Azure SQL using DefaultAzureCredential."""
+    token = credential.get_token("https://database.windows.net/.default").token
+    token_bytes = token.encode("UTF-16-LE")
+    token_struct = struct.pack(f'<I{len(token_bytes)}s', len(token_bytes), token_bytes)
+    SQL_COPT_SS_ACCESS_TOKEN = 1256
+    conn_str = (
+        f"Driver={{ODBC Driver 18 for SQL Server}};"
+        f"SERVER={az_db_server};"
+        f"DATABASE={az_db_database}"
+    )
+    return pyodbc.connect(conn_str, attrs_before={SQL_COPT_SS_ACCESS_TOKEN: token_struct})
 
 
 @tool
@@ -37,16 +53,7 @@ def fetch_customer_information(config: RunnableConfig) -> list[dict]:
     if not customer_name:
         raise ValueError("No customer Name configured.")
 
-    connection = pyodbc.connect(
-        "Driver={ODBC Driver 18 for SQL Server};SERVER="
-        + az_db_server
-        + ";DATABASE="
-        + az_db_database
-        + ";UID="
-        + az_db_username
-        + ";PWD="
-        + az_db_password
-    )
+    connection = get_sql_connection()
     cursor = connection.cursor()
     query = """
     SELECT
@@ -101,16 +108,7 @@ def get_available_service_slots(start_date):
 
     """
     response_message = ""
-    connection = pyodbc.connect(
-        "Driver={ODBC Driver 18 for SQL Server};SERVER="
-        + az_db_server
-        + ";DATABASE="
-        + az_db_database
-        + ";UID="
-        + az_db_username
-        + ";PWD="
-        + az_db_password
-    )
+    connection = get_sql_connection()
     cursor = connection.cursor()
     query = """
     
@@ -163,16 +161,7 @@ def create_service_appointment_slot(start_date_time, vehicle_id=1, service_type_
 
     """
     response_message = ""
-    connection = pyodbc.connect(
-        "Driver={ODBC Driver 18 for SQL Server};SERVER="
-        + az_db_server
-        + ";DATABASE="
-        + az_db_database
-        + ";UID="
-        + az_db_username
-        + ";PWD="
-        + az_db_password
-    )
+    connection = get_sql_connection()
     cursor = connection.cursor()
 
     try:
@@ -209,8 +198,8 @@ def create_service_appointment_slot(start_date_time, vehicle_id=1, service_type_
 
 
 def get_embedding(text):
-    headers = {"Content-Type": "application/json", "api-key": az_openai_key}
-    # print("they key is ", az_openai_key)
+    token = credential.get_token("https://cognitiveservices.azure.com/.default").token
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {token}"}
     url = f"{az_openai_endpoint}openai/deployments/{az_openai_embedding_deployment_name}/embeddings?api-version=2023-05-15"
     print("the url is ", url)
     payload = {"input": text}
@@ -261,16 +250,7 @@ def store_service_feedback(
         # v_feedback_text = "'"+str(get_embedding(feedback_text))+"'"
         # v_feedback_text = my_embeddingfv
 
-        connection = pyodbc.connect(
-            "Driver={ODBC Driver 18 for SQL Server};SERVER="
-            + az_db_server
-            + ";DATABASE="
-            + az_db_database
-            + ";UID="
-            + az_db_username
-            + ";PWD="
-            + az_db_password
-        )
+        connection = get_sql_connection()
         cursor = connection.cursor()
 
         # Call the stored procedure
