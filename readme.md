@@ -243,7 +243,6 @@ In a traditional architecture this would require **multiple disparate systems** 
 
 ```
 ├── agent.py                     # Main multi-agent bot application
-├── analyze_feedback.py          # Standalone script for vector search on feedback
 ├── feedback_explorer.py         # Streamlit UI for interactive feedback analysis
 ├── requirements.txt             # Python dependencies
 ├── .env                         # Environment variables (not checked in)
@@ -321,7 +320,7 @@ In a traditional architecture this would require **multiple disparate systems** 
     2. `scripts/create_service_schedule_sp.sql` — creates the `CreateServiceSchedule` procedure
     3. `scripts/capture-service-rating.sql` — creates the `InsertServiceFeedback` procedure
     4. `scripts/analyze_feedback_sp.sql` — creates the `AnalyzeFeedback` procedure
-    5. `scripts/get_embeddings_sp.sql` — creates the embedding generation procedure
+    5. `scripts/get_embeddings_sp.sql` — creates the embedding generation procedure (**update the hardcoded Azure OpenAI endpoint URL** inside the procedure body to match your deployment)
 
 6. **Set up Azure AI Search** — upload the contents of `documents/heromotocorp-sample-understood.md` to an Azure AI Search index named `contoso-motocorp-index` with a semantic configuration named `contoso-motocorp-config`.
 
@@ -373,18 +372,10 @@ This opens a browser-based UI with:
 
 ### Additional CLI Tools
 
-These are alternative command-line scripts for feedback analysis — useful for scripting or quick one-off queries.
+An alternative command-line script for feedback analysis — useful for scripting or quick one-off queries.
 
 **Vector search with filters:**
 
 ```sh
 python scripts/vector_feedback_search.py --query-text "poor service quality" --max-rating 3 --distance-threshold 0.5 --top 10
 ```
-
-**Standalone feedback analysis** (runs a predefined query via the `AnalyzeFeedback` stored procedure):
-
-```sh
-python analyze_feedback.py
-```
-
-Runs a predefined vector search query against the `Service_Feedback` table using the `AnalyzeFeedback` stored procedure.
