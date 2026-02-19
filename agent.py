@@ -47,7 +47,7 @@ from langgraph.graph.message import AnyMessage, add_messages
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable, RunnableConfig
 from langgraph.graph import StateGraph
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 ### $env:TAVILY_API_KEY = "tvly-<yourkey>"
 
@@ -127,21 +127,20 @@ class CompleteOrEscalate(BaseModel):
     cancel: bool = True
     reason: str
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "cancel": True,
-                "reason": "User changed their mind about the current task.",
-            },
-            "example 2": {
-                "cancel": True,
-                "reason": "I have fully completed the task.",
-            },
-            "example 3": {
-                "cancel": False,
-                "reason": "I need to search the user's emails or calendar for more information.",
-            },
-        }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "cancel": True,
+            "reason": "User changed their mind about the current task.",
+        },
+        "example 2": {
+            "cancel": True,
+            "reason": "I have fully completed the task.",
+        },
+        "example 3": {
+            "cancel": False,
+            "reason": "I need to search the user's emails or calendar for more information.",
+        },
+    })
 
 
 # Service Scheduling Assistant
@@ -240,14 +239,13 @@ class ToServiceScheduler(BaseModel):
         description="The name of the Customer on which the service appointment is to be scheduled."
     )
 
-    class Config:
-        json_schema_extra = {
-            "example": {
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
                 "request": "I am looking for service appointments for my vehicle.",
                 "start_date": "2023-07-01",
                 "customer_name": "some user name",
             }
-        }
+        })
 
 class ToServiceFeedback(BaseModel):
     """Transfers work to a specialized assistant to handle vehicle service feedback capture."""
@@ -269,28 +267,26 @@ class ToServiceFeedback(BaseModel):
         description="The overall comments provided by the customer for the service provided."
     )
 
-    class Config:
-        json_schema_extra = {
-            "example": {
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
                 "request": "Here is my feedback on the servicing of my vehicle.",
                 "schedule_id": 1,
                 "customer_id": 1,
                 "overall_rating": 5,
                 "overall_comments": "The service was excellent. I am very satisfied with the service provided.",
             }
-        }
+        })
 
 class ToSearchQnA(BaseModel):
     """Transfers work to a specialized assistant to handle vehicle service scheduling."""
 
     query: str = Field(description="the search query to be performed.")
 
-    class Config:
-        json_schema_extra = {
-            "example": {
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
                 "query": "What are the safety features in my bike?",
             }
-        }
+        })
 
 
 # Primary Assistant
