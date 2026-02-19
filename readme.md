@@ -107,38 +107,61 @@ Each agent can respond directly to the user without routing back through the sup
 
 ## Usage
 
-### Running the Bot
+This project has two distinct applications for two different user personas:
+
+---
+
+### 1. Customer-Facing Service Bot
+
+**Audience:** Customers interacting with Contoso Motocorp for vehicle services.
+
+The multi-agent conversational bot allows customers to:
+- Schedule vehicle service appointments
+- Provide feedback and ratings on completed services
+- Ask product and vehicle-related questions
+
+**Launch:**
 
 ```sh
 python agent.py
 ```
 
-The bot greets the logged-in customer by name and presents available capabilities. Type your request in natural language — the supervisor agent will route to the appropriate specialist.
+The bot greets the customer by name, introduces itself, and lists the available capabilities. Customers type their requests in natural language — the supervisor agent routes to the appropriate specialist agent automatically.
 
-### Feedback Explorer (Streamlit UI)
+---
 
-An interactive UI for exploring service feedback using **vector similarity search** combined with **rating filters**:
+### 2. Back-Office Feedback Explorer
+
+**Audience:** Back-office / operations staff analyzing customer sentiment and service quality.
+
+A Streamlit-based interactive dashboard for exploring customer feedback stored in the Azure SQL vector database. Staff can combine semantic vector search with rating filters to identify trends, problem areas, and low-satisfaction patterns.
+
+**Launch:**
 
 ```sh
 streamlit run feedback_explorer.py
 ```
 
-Features:
+This opens a browser-based UI with:
 - **Vector search** — enter a natural language sentiment query (e.g., "unhappy with cleanliness"), which gets embedded via Azure OpenAI and searched against the `feedback_vector` column using cosine distance
 - **Rating sliders** — filter by max rating across 5 dimensions (overall experience, quality of work, timeliness, politeness, cleanliness)
 - **Distance threshold** — control how similar results must be to the query
-- **Generated T-SQL** — view the exact query being executed
-- **Results grid** — browse results in an interactive data table
+- **Generated T-SQL** — view the exact query being executed against Azure SQL
+- **Results grid** — browse matching feedback in an interactive data table
 
-### Vector Search (CLI)
+---
 
-For scripted or command-line vector search on feedback:
+### Additional CLI Tools
+
+These are alternative command-line scripts for feedback analysis — useful for scripting or quick one-off queries.
+
+**Vector search with filters:**
 
 ```sh
 python scripts/vector_feedback_search.py --query-text "poor service quality" --max-rating 3 --distance-threshold 0.5 --top 10
 ```
 
-### Standalone Feedback Analysis
+**Standalone feedback analysis** (runs a predefined query via the `AnalyzeFeedback` stored procedure):
 
 ```sh
 python analyze_feedback.py
