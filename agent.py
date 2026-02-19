@@ -586,6 +586,17 @@ def stream_graph_updates(user_input: str):
     print(r1[-1].content)
 
 
+customer_name = config["configurable"]["customer_name"]
+print(f"\n{'='*60}")
+print(f"  Contoso Motocorp Service Assistant")
+print(f"{'='*60}")
+print(f"\n  Hello, {customer_name}! Welcome to Contoso Motocorp.")
+print(f"  I'm your AI service assistant. Here's how I can help:\n")
+print(f"  - Schedule vehicle service appointments")
+print(f"  - Capture feedback on completed services")
+print(f"  - Answer questions about your vehicle or services")
+print(f"\n  Type 'quit' or 'exit' to end the conversation.\n")
+
 while True:
     try:
         user_input = input("User: ")
