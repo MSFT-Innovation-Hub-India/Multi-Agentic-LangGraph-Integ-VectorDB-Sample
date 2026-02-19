@@ -18,8 +18,8 @@ GO
 
 IF NOT EXISTS (
     SELECT 1
-    FROM sys.symmetric_keys
-    WHERE name = '##MS_DatabaseMasterKey##'
+FROM sys.symmetric_keys
+WHERE name = '##MS_DatabaseMasterKey##'
 )
 BEGIN
     CREATE MASTER KEY ENCRYPTION BY PASSWORD = 'TempStrong#2026!RotateImmediately';
@@ -29,18 +29,8 @@ GO
 
 IF EXISTS (
     SELECT 1
-    FROM sys.database_scoped_credentials
-    WHERE name = 'OpenAICredentialMI'
-)
-BEGIN
-    DROP DATABASE SCOPED CREDENTIAL [OpenAICredentialMI];
-END
-GO
-
-IF EXISTS (
-    SELECT 1
-    FROM sys.database_scoped_credentials
-    WHERE name = 'OpenAICredentialMI'
+FROM sys.database_scoped_credentials
+WHERE name = 'OpenAICredentialMI'
 )
 BEGIN
     DROP DATABASE SCOPED CREDENTIAL [OpenAICredentialMI];
@@ -52,7 +42,7 @@ WITH IDENTITY = 'Managed Identity';
 GO
 
 CREATE OR ALTER PROCEDURE [dbo].[get_embeddings]
-(
+    (
     @text nvarchar(max),
     @embedding vector(1536) output
 )
@@ -77,12 +67,12 @@ begin
     begin catch
         if error_number() = 31630
         begin
-            throw 50003, 'Managed identity credential is policy-compliant but not supported by sp_invoke_external_rest_endpoint in this Azure SQL runtime (Msg 31630). Use app/service-layer MI to generate embedding and pass vector to SQL query.', 1;
-        end
+        ;throw 50003, 'Managed identity credential is policy-compliant but not supported by sp_invoke_external_rest_endpoint in this Azure SQL runtime (Msg 31630). Use app/service-layer MI to generate embedding and pass vector to SQL query.', 1;
+    end
         else
         begin
-            throw;
-        end
+        ;throw;
+    end
     end catch
 
     -- Parse different response shapes returned by sp_invoke_external_rest_endpoint
@@ -113,9 +103,10 @@ begin
                 left(@errorBody, 1800)
             );
 
-        throw 50001, @errMsg, 1;
+        ;throw 50001, @errMsg, 1;
     end
 
     -- Convert JSON array to vector and return it
     set @embedding = cast(@jsonArray as vector(1536));
 end
+GO
