@@ -1,3 +1,70 @@
+-- =============================================
+-- Create Tables
+-- =============================================
+
+CREATE TABLE Customers (
+    customer_id INT PRIMARY KEY,
+    name NVARCHAR(100) NOT NULL,
+    contact_number NVARCHAR(20),
+    email NVARCHAR(100),
+    address NVARCHAR(255)
+);
+
+CREATE TABLE Vehicles (
+    vehicle_id INT PRIMARY KEY,
+    customer_id INT NOT NULL,
+    model NVARCHAR(100),
+    year INT,
+    registration_number NVARCHAR(20),
+    FOREIGN KEY (customer_id) REFERENCES Customers(customer_id)
+);
+
+CREATE TABLE Service_Types (
+    service_type_id INT PRIMARY KEY,
+    service_name NVARCHAR(100),
+    duration_minutes INT
+);
+
+CREATE TABLE Service_Schedules (
+    schedule_id INT PRIMARY KEY,
+    vehicle_id INT NOT NULL,
+    service_type_id INT NOT NULL,
+    service_date DATE,
+    start_time TIME,
+    end_time TIME,
+    status NVARCHAR(50),
+    FOREIGN KEY (vehicle_id) REFERENCES Vehicles(vehicle_id),
+    FOREIGN KEY (service_type_id) REFERENCES Service_Types(service_type_id)
+);
+
+CREATE TABLE Service_Centers (
+    center_id INT PRIMARY KEY,
+    name NVARCHAR(100),
+    location NVARCHAR(255),
+    contact_number NVARCHAR(20)
+);
+
+CREATE TABLE Technicians (
+    technician_id INT PRIMARY KEY,
+    name NVARCHAR(100),
+    center_id INT NOT NULL,
+    specialization NVARCHAR(100),
+    FOREIGN KEY (center_id) REFERENCES Service_Centers(center_id)
+);
+
+CREATE TABLE Appointments (
+    appointment_id INT PRIMARY KEY,
+    schedule_id INT NOT NULL,
+    technician_id INT NOT NULL,
+    appointment_status NVARCHAR(50),
+    FOREIGN KEY (schedule_id) REFERENCES Service_Schedules(schedule_id),
+    FOREIGN KEY (technician_id) REFERENCES Technicians(technician_id)
+);
+
+-- =============================================
+-- Seed Data
+-- =============================================
+
 -- Insert into Customers
 INSERT INTO Customers (customer_id, name, contact_number, email, address) VALUES
 (1, 'Ravi Kumar', '9876543210', 'ravi.kumar@example.com', '123 MG Road, Bengaluru'),

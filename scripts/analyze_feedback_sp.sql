@@ -8,7 +8,7 @@ GO
 -- Create Date: <Create Date, , >
 -- Description: <Description, , >
 -- =============================================
-ALTER PROCEDURE [dbo].[AnalyzeFeedback]
+CREATE OR ALTER PROCEDURE [dbo].[AnalyzeFeedback]
 (
 	@user_query_vector_json NVARCHAR(MAX)
 )

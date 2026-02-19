@@ -51,7 +51,7 @@ CREATE DATABASE SCOPED CREDENTIAL [OpenAICredentialMI]
 WITH IDENTITY = 'Managed Identity';
 GO
 
-ALTER procedure [dbo].[get_embeddings]
+CREATE OR ALTER PROCEDURE [dbo].[get_embeddings]
 (
     @text nvarchar(max),
     @embedding vector(1536) output
@@ -62,7 +62,8 @@ begin
     declare @url varchar(max);
     declare @payload nvarchar(max) = json_object('input': @text);
 
-    set @url = 'https://oai-sansri-eastus2.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2023-05-15';
+    -- TODO: Update this URL to match YOUR Azure OpenAI endpoint and embedding deployment name.
+    set @url = 'https://<your-openai>.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2023-05-15';
 
     begin try
         exec dbo.sp_invoke_external_rest_endpoint 
