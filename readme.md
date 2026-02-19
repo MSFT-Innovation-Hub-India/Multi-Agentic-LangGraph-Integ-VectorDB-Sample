@@ -221,6 +221,24 @@ sequenceDiagram
     Browser->>Staff: Browse feedback with similarity scores
 ```
 
+### Why an Integrated Vector Database Matters
+
+The `Service_Feedback` table in Azure SQL Database stores **three kinds of data in a single row**:
+
+| Column type | Examples | Purpose |
+|---|---|---|
+| **Structured ratings** | `rating_overall_experience`, `rating_quality_of_work`, `rating_timeliness`, `rating_politeness`, `rating_cleanliness` (integers 1–5) | Quantitative scoring, aggregation, filtering |
+| **Free-form text** | `feedback_text` (nvarchar) | Verbatim customer comments |
+| **Vector embedding** | `feedback_vector` (vector(1536)) | Semantic similarity search via `vector_distance('cosine', …)` |
+
+Because all three live in the same table, the Feedback Explorer can issue **a single T-SQL query** that:
+
+1. **Semantically searches** free-form feedback text by comparing the query embedding against `feedback_vector` using cosine distance.
+2. **Filters on structured ratings** (e.g., `rating_cleanliness <= 2`) using standard `WHERE` clauses.
+3. **Joins, groups, and counts** across both dimensions — for example, counting how many low-cleanliness-rated feedbacks are semantically similar to "vehicle returned dirty."
+
+In a traditional architecture this would require **multiple disparate systems** — a relational database for ratings, a separate vector store for embeddings, and an application layer to reconcile results across both. With Azure SQL's native vector support, the operational data, free-text feedback, and vector embeddings coexist in one engine, eliminating cross-system ETL, consistency issues, and reconciliation logic. One query, one transaction boundary, one source of truth.
+
 ## Project Structure
 
 ```
