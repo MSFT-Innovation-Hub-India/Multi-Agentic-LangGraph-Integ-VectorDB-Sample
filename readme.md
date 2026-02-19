@@ -12,8 +12,7 @@ It helps customers schedule service appointments, provide feedback, and answer q
 - **.env**: Environment variables for database and API configurations.
 - **.gitignore**: Specifies files and directories to be ignored by Git.
 - **analyze_feedback.py**: Sample code to perform vector search on the Integrated Vector database - Azure SQL Database - to query based on user feedback
-- **bot-app-v1.py**: Uses multi agent with a supervisor routing calls to each of them. All user communication is routed via supervisor
-- **bot-app-v2.py**: Hierarchical, multi agent system. Each Agent is powered by LLM and can make decisions. User communication happens directly
+- **agent.py**: Hierarchical, multi agent system. Each Agent is powered by LLM and can make decisions. User communication happens directly
 - **readme.md**: This file.
 - **requirements.txt**: List of Python dependencies required for the project.
 
@@ -86,7 +85,7 @@ ai_semantic_config = "contoso-motocorp-config"
 To run the bot application, execute the following command:
 
 ```sh
-python bot-app-v2.py
+python agent.py
 ```
 
 ### Analyzing Feedback
@@ -151,11 +150,6 @@ To set up the database, execute the SQL scripts in the scripts directory in the 
 
 ### Graph comprising the Agents
 
-bot-app-v1.py -> implements a simple, multi agent solution using `langGraph`. Here the supervisor agent routes to the other agents, who merely use the tool and revert to the supervisor agent, before that is relayed to the user
-
-![Contoso Motocorp Service Bot](graph_bot_app_v1.png)
-
-
-bot-app-v2.py -> Implements a full blown multi agent solution using `langGraph`. This has been adapted based on a similar sample in the Travel domain [here](https://langchain-ai.github.io/langgraph/tutorials/customer-support/customer-support/#conversation).Here the supervisor agents routes to the other agents, each of which are powered by an LLM and can make decisions of their own. They choose to use the different tools they have access to, can respond to the user directly and not have to go through the supervisor, when in a context in the conversation. Each of the Agents have a system prompt that determines their behavior and purpose.
+agent.py -> Implements a full blown multi agent solution using `langGraph`. This has been adapted based on a similar sample in the Travel domain [here](https://langchain-ai.github.io/langgraph/tutorials/customer-support/customer-support/#conversation).Here the supervisor agents routes to the other agents, each of which are powered by an LLM and can make decisions of their own. They choose to use the different tools they have access to, can respond to the user directly and not have to go through the supervisor, when in a context in the conversation. Each of the Agents have a system prompt that determines their behavior and purpose.
 
 ![Contoso Motocorp Service Bot](graph_bot_app_v2.png)
