@@ -19,6 +19,208 @@ Each agent can respond directly to the user without routing back through the sup
 
 ![Agent Graph](graph_bot_app_v2.png)
 
+### System Overview
+
+Both user-facing applications share the same Azure back-end services and authenticate exclusively through `DefaultAzureCredential` (no API keys or passwords).
+
+```mermaid
+flowchart TB
+    subgraph Clients["User Interfaces"]
+        C["Customer\n(CLI Terminal)"]
+        S["Back-Office Staff\n(Web Browser)"]
+    end
+
+    subgraph Apps["Applications"]
+        A["agent.py\nMulti-Agent Service Bot"]
+        F["feedback_explorer.py\nStreamlit Dashboard"]
+    end
+
+    subgraph LG["LangGraph Agent Graph"]
+        PA["Primary Assistant\n(Supervisor / Router)"]
+        SS["Service Scheduling Agent"]
+        SF["Service Feedback Agent"]
+        SQ["Search Q&A Agent"]
+        PA -- "ToServiceScheduler" --> SS
+        PA -- "ToServiceFeedback" --> SF
+        PA -- "ToSearchQnA" --> SQ
+    end
+
+    subgraph AZ["Azure Services"]
+        AAD["Microsoft Entra ID\n(DefaultAzureCredential)"]
+        GPT["Azure OpenAI\nGPT-4o (Chat)"]
+        EMB["Azure OpenAI\nada-002 (Embeddings)"]
+        DB[("Azure SQL Database\nvector(1536)")]
+        AIS["Azure AI Search\n(Semantic)"]
+    end
+
+    C --> A
+    A --> LG
+    LG -- "Chat completions" --> GPT
+    SS -- "Slot queries &\nappointment creation" --> DB
+    SF -- "Store feedback + vector" --> DB
+    SF -- "Embed feedback text" --> EMB
+    SQ -- "Semantic search" --> AIS
+
+    S --> F
+    F -- "Embed query text" --> EMB
+    F -- "vector_distance\ncosine search" --> DB
+
+    A -. "auth" .-> AAD
+    F -. "auth" .-> AAD
+```
+
+### Customer-Facing Bot — Request / Response Flow
+
+Each conversation turn flows through the LangGraph state graph. On the **first turn**, customer data is fetched from Azure SQL and cached in state; subsequent turns reuse the cache. The Primary Assistant classifies user intent via GPT-4o tool binding and delegates to the matching sub-agent. Sub-agents maintain multi-turn dialog via a `dialog_state` stack and a `MemorySaver` checkpointer keyed by `thread_id`.
+
+```mermaid
+sequenceDiagram
+    actor Customer
+    participant Bot as agent.py (LangGraph)
+    participant PA as Primary Assistant
+    participant Sub as Sub-Agent
+    participant GPT as Azure OpenAI (GPT-4o)
+    participant EMB as Azure OpenAI (ada-002)
+    participant SQL as Azure SQL Database
+    participant AIS as Azure AI Search
+    participant Auth as Entra ID
+
+    Note over Bot,Auth: Application Startup
+    Bot->>Auth: DefaultAzureCredential()
+    Auth-->>Bot: Credential + token provider
+    Bot->>GPT: Initialize AzureChatOpenAI
+    Bot->>Bot: Compile StateGraph + MemorySaver
+    Bot->>Customer: Print greeting + capability list
+
+    Note over Customer,Auth: Conversation Turn (repeated per message)
+    Customer->>Bot: Natural language message
+    Bot->>Bot: graph.stream({messages: [input]}, config)
+
+    Note over Bot,SQL: fetch_customer_info node
+    Bot->>Auth: get_token("database.windows.net")
+    Auth-->>Bot: SQL access token
+    Bot->>SQL: SELECT Customers JOIN Vehicles<br/>JOIN Service_Schedules<br/>WHERE c.name = ? (parameterized)
+    SQL-->>Bot: Customer profile + vehicle + history
+    Note right of Bot: Cached after first turn
+
+    Note over Bot,PA: route_to_workflow (check dialog_state)
+    Bot->>PA: Invoke with system prompt + customer_info + messages
+    PA->>GPT: Chat completion with tool bindings:<br/>ToServiceScheduler, ToServiceFeedback, ToSearchQnA
+    GPT-->>PA: Intent classification → tool_call or direct reply
+
+    alt Service Scheduling (ToServiceScheduler)
+        PA->>Bot: tool_call: ToServiceScheduler
+        Bot->>Sub: enter_service_scheduling<br/>(set dialog_state, inject ToolMessage)
+        Sub->>GPT: Chat completion (scheduling system prompt)
+        GPT-->>Sub: tool_call: get_available_service_slots
+        Sub->>Auth: get_token("database.windows.net")
+        Sub->>SQL: CTE query: PotentialSlots minus BookedSlots<br/>for requested date range (parameterized)
+        SQL-->>Sub: Available 1-hour time slots
+        Sub->>GPT: Format results for customer
+        GPT-->>Sub: Slot list in natural language
+        Sub-->>Customer: "Here are the available slots …"
+
+        Note over Customer,Sub: Customer selects a slot (next turn)
+        Customer->>Bot: "Book the 2 PM slot on Monday"
+        Bot->>Bot: graph.stream() → fetch_customer_info (cached)
+        Bot->>Sub: route_to_workflow → service_scheduling (active)
+        Sub->>GPT: Chat completion
+        GPT-->>Sub: tool_call: create_service_appointment_slot
+        Sub->>SQL: EXEC CreateServiceSchedule<br/>@SelectedSlotStart, @VehicleID, @ServiceTypeID
+        SQL-->>Sub: Appointment created
+        Sub->>GPT: Generate confirmation message
+        GPT-->>Sub: CompleteOrEscalate (task done)
+        Sub->>Bot: leave_skill → pop dialog_state
+        Bot->>PA: Control returns to Primary Assistant
+
+    else Service Feedback (ToServiceFeedback)
+        PA->>Bot: tool_call: ToServiceFeedback
+        Bot->>Sub: enter_service_feedback (set dialog_state)
+
+        loop Multi-turn feedback collection
+            Sub->>GPT: Chat completion (feedback system prompt)
+            GPT-->>Sub: Ask for rating or specific aspect
+            Sub-->>Customer: "Please rate overall experience (1-5)"
+            Customer->>Bot: Provides rating + comments
+            Bot->>Sub: Resume in service_feedback state
+        end
+
+        Sub->>GPT: All feedback collected
+        GPT-->>Sub: tool_call: store_service_feedback
+        Sub->>Auth: get_token("cognitiveservices")
+        Sub->>EMB: POST /embeddings {input: feedback_text}
+        EMB-->>Sub: 1536-dimension embedding vector
+        Sub->>Auth: get_token("database.windows.net")
+        Sub->>SQL: EXEC InsertServiceFeedback<br/>(schedule_id, customer_id, feedback_text,<br/>embedding_vector, 5 rating columns, date)
+        SQL-->>Sub: Feedback + vector stored
+        Sub->>GPT: Generate thank-you message
+        GPT-->>Sub: CompleteOrEscalate
+        Sub->>Bot: leave_skill → pop dialog_state
+        Bot->>PA: Control returns to Primary Assistant
+
+    else Product Q&A (ToSearchQnA)
+        PA->>Bot: tool_call: ToSearchQnA
+        Bot->>Sub: enter_search_qna (set dialog_state)
+        Sub->>GPT: Chat completion (search system prompt)
+        GPT-->>Sub: tool_call: perform_search_based_qna
+        Sub->>Auth: DefaultAzureCredential
+        Sub->>AIS: Semantic search<br/>index: contoso-motocorp-index<br/>config: contoso-motocorp-config<br/>query_type: semantic, top: 5
+        AIS-->>Sub: Top 5 ranked document chunks
+        Sub->>GPT: Chat completion with search context
+        GPT-->>Sub: Grounded natural language answer
+        Sub-->>Customer: Answer from product documentation
+    end
+```
+
+### Back-Office Feedback Explorer — Request / Response Flow
+
+The Streamlit dashboard converts a natural-language query into an embedding vector via Azure OpenAI, then runs a parameterized `vector_distance` cosine-similarity query against Azure SQL, combining semantic search with structured rating filters. The generated T-SQL is displayed alongside the results for transparency.
+
+```mermaid
+sequenceDiagram
+    actor Staff as Back-Office Staff
+    participant Browser as Web Browser
+    participant ST as Streamlit (feedback_explorer.py)
+    participant Auth as Entra ID
+    participant EMB as Azure OpenAI (ada-002)
+    participant SQL as Azure SQL Database
+
+    Note over Staff,SQL: Application Launch
+    Staff->>Browser: streamlit run feedback_explorer.py
+    Browser->>ST: HTTP request
+    ST->>Browser: Render page title + sidebar controls
+
+    Note over Staff,SQL: Configure Search Parameters
+    Staff->>Browser: Enter vector search query<br/>(e.g., "unhappy with cleanliness")
+    Staff->>Browser: Adjust 5 rating sliders<br/>(Overall, Quality, Timeliness, Politeness, Cleanliness)
+    Staff->>Browser: Set cosine distance threshold (0.0–1.0)
+    Staff->>Browser: Set Top N results (1–100)
+    Staff->>Browser: Click "Run Query"
+    Browser->>ST: Submit parameters
+
+    Note over ST,ST: T-SQL Generation
+    ST->>ST: build_query(): generate display T-SQL<br/>with vector_distance + rating WHERE clauses
+    ST->>Browser: Show generated T-SQL
+
+    Note over ST,EMB: Embedding Generation
+    ST->>Auth: get_token("cognitiveservices")
+    Auth-->>ST: Bearer token
+    ST->>EMB: POST /openai/deployments/ada-002/embeddings<br/>{input: "unhappy with cleanliness"}
+    EMB-->>ST: 1536-dimension embedding vector
+
+    Note over ST,SQL: Parameterized Vector Search
+    ST->>Auth: get_token("database.windows.net")
+    Auth-->>ST: SQL access token (pyodbc attr 1256)
+    ST->>SQL: DECLARE @e vector(1536) = CAST(? AS vector(1536));<br/>SELECT TOP(N) feedback_id, feedback_text, ratings,<br/>vector_distance('cosine', @e, feedback_vector) AS distance<br/>FROM Service_Feedback<br/>WHERE distance <= ? AND ratings <= ?<br/>ORDER BY distance; (parameterized)
+    SQL-->>ST: Matching feedback rows + cosine distances
+
+    Note over ST,Browser: Results Display
+    ST->>ST: Convert rows to pandas DataFrame
+    ST->>Browser: Render result count header
+    ST->>Browser: Render interactive data table<br/>(sortable, scrollable, full-width)
+    Browser->>Staff: Browse feedback with similarity scores
+```
+
 ## Project Structure
 
 ```
