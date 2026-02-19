@@ -255,8 +255,7 @@ In a traditional architecture this would require **multiple disparate systems** 
 │   ├── create_service_schedule_sp.sql  # CreateServiceSchedule stored procedure
 │   ├── capture-service-rating.sql      # InsertServiceFeedback stored procedure
 │   ├── analyze_feedback_sp.sql         # AnalyzeFeedback stored procedure
-│   ├── get_embeddings_sp.sql           # Embedding generation stored procedure
-│   └── vector_feedback_search.py       # CLI vector search script
+│   └── get_embeddings_sp.sql           # Embedding generation stored procedure
 └── service_requests/
     ├── db_tools.py              # Database tools used by agents
     └── search_tools.py          # Azure AI Search tools used by agents
@@ -367,15 +366,3 @@ This opens a browser-based UI with:
 - **Distance threshold** — control how similar results must be to the query
 - **Generated T-SQL** — view the exact query being executed against Azure SQL
 - **Results grid** — browse matching feedback in an interactive data table
-
----
-
-### Additional CLI Tools
-
-An alternative command-line script for feedback analysis — useful for scripting or quick one-off queries.
-
-**Vector search with filters:**
-
-```sh
-python scripts/vector_feedback_search.py --query-text "poor service quality" --max-rating 3 --distance-threshold 0.5 --top 10
-```
