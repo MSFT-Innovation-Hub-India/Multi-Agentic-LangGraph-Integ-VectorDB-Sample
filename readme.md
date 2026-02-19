@@ -269,7 +269,7 @@ In a traditional architecture this would require **multiple disparate systems** 
   - **Azure OpenAI** (GPT-4o deployment + text-embedding-ada-002)
   - **Azure SQL Database** with [native vector support](https://learn.microsoft.com/azure/azure-sql/database/ai-artificial-intelligence-intelligent-applications?view=azuresql)
   - **Azure AI Search** (for product Q&A)
-- ODBC Driver 18 for SQL Server
+- [ODBC Driver 18 for SQL Server](https://learn.microsoft.com/sql/connect/odbc/download-odbc-driver-for-sql-server) — required by `pyodbc` at runtime. Download and install the Windows driver before running the application.
 - Authentication via `DefaultAzureCredential` (Azure CLI, managed identity, etc.)
 
 ## Setup
