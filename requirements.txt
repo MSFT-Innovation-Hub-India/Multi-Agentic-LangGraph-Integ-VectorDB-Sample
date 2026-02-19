@@ -8,5 +8,7 @@ ipython
 tavily-python
 pyodbc
 websockets
+streamlit
+pandas
 azure-search-documents
 azure-identity

@@ -1,155 +1,147 @@
 # Contoso Motocorp Service Bot
 
-This repository contains the source code for the Contoso Motocorp Service Bot, implemented as a multi agent system using `langGraph`.
-It helps customers schedule service appointments, provide feedback, and answer queries related to their vehicles.
+A multi-agent customer service assistant for a motorcycle dealership, built with [LangGraph](https://langchain-ai.github.io/langgraph/), Azure OpenAI, Azure SQL Database (with native vector support), and Azure AI Search.
+
+The bot helps customers schedule vehicle service appointments, provide feedback on completed services, and get answers to product-related questions — all through natural conversation.
+
+## Architecture
+
+The application implements a **hierarchical multi-agent system** using LangGraph, adapted from the [LangGraph customer support tutorial](https://langchain-ai.github.io/langgraph/tutorials/customer-support/customer-support/#conversation). A primary supervisor agent routes conversations to specialized agents, each powered by its own LLM and system prompt:
+
+| Agent | Purpose | Tools |
+|---|---|---|
+| **Primary Assistant** | Greets the user, understands intent, and delegates to the right specialist | Routes to sub-agents |
+| **Service Scheduler** | Handles appointment booking and slot queries | `get_available_service_slots`, `create_service_appointment_slot` |
+| **Service Feedback** | Captures post-service ratings and comments | `store_service_feedback` |
+| **Search Q&A** | Answers product/vehicle questions using Azure AI Search | `perform_search_based_qna` |
+
+Each agent can respond directly to the user without routing back through the supervisor, and can escalate back when the conversation context changes.
+
+![Agent Graph](graph_bot_app_v2.png)
 
 ## Project Structure
 
-## Files and Directories
+```
+├── agent.py                     # Main multi-agent bot application
+├── analyze_feedback.py          # Standalone script for vector search on feedback
+├── feedback_explorer.py         # Streamlit UI for interactive feedback analysis
+├── requirements.txt             # Python dependencies
+├── .env                         # Environment variables (not checked in)
+├── .gitignore
+├── documents/
+│   ├── hf_100_aug_2024.pdf      # Hero Honda HF100 user manual (source)
+│   └── heromotocorp-sample-understood.md  # Extracted & enriched content for search index
+├── scripts/
+│   ├── db-create.sql            # Database table creation & seed data
+│   ├── create_service_schedule_sp.sql  # CreateServiceSchedule stored procedure
+│   ├── capture-service-rating.sql      # InsertServiceFeedback stored procedure
+│   ├── analyze_feedback_sp.sql         # AnalyzeFeedback stored procedure
+│   ├── get_embeddings_sp.sql           # Embedding generation stored procedure
+│   └── vector_feedback_search.py       # CLI vector search script
+└── service_requests/
+    ├── db_tools.py              # Database tools used by agents
+    └── search_tools.py          # Azure AI Search tools used by agents
+```
 
-### Root Directory
+## Prerequisites
 
-- **.env**: Environment variables for database and API configurations.
-- **.gitignore**: Specifies files and directories to be ignored by Git.
-- **analyze_feedback.py**: Sample code to perform vector search on the Integrated Vector database - Azure SQL Database - to query based on user feedback
-- **agent.py**: Hierarchical, multi agent system. Each Agent is powered by LLM and can make decisions. User communication happens directly
-- **readme.md**: This file.
-- **requirements.txt**: List of Python dependencies required for the project.
-
-### Scripts Directory
-
-- **analyze_feedback_sp.sql**: SQL script for the `AnalyzeFeedback` stored procedure.
-- **capture-service-rating.sql**: SQL script for the `InsertServiceFeedback` stored procedure.
-- **create_service_schedule_sp.sql**: SQL script for the `CreateServiceSchedule` stored procedure. 
-- **db-create.sql**: SQL script to create and populate the database tables that can be used to run and demo this application
-
-### Search data setup
-
-The folder documents contains a PDF which is the user manual of Hero Honda HF100 Bike from the internet. Multimodal data extraction was used to extract insights from the text and images in this document, and the resulting enriched textual data is generated, and saved to file 'heromotocorp-sample-understood.md'
-This could be uploaded to Azure AI Search, an index created and used in the application, as the basis on which customer queries on their product purchased can be answered
-
-### Service Requests Directory
-
-These are called by different Agents in the application
-
-- **db_tools.py**: Contains database utility functions and tools. 
-- **search_tools.py**: Contains tools for performing search-based Q&A.
+- Python 3.12+
+- Azure subscription with:
+  - **Azure OpenAI** (GPT-4o deployment + text-embedding-ada-002)
+  - **Azure SQL Database** with [native vector support](https://learn.microsoft.com/azure/azure-sql/database/ai-artificial-intelligence-intelligent-applications?view=azuresql)
+  - **Azure AI Search** (for product Q&A)
+- ODBC Driver 18 for SQL Server
+- Authentication via `DefaultAzureCredential` (Azure CLI, managed identity, etc.)
 
 ## Setup
 
 1. **Clone the repository**:
+
     ```sh
     git clone <repository-url>
-    cd <repository-directory>
+    cd Multi-Agentic-LangGraph-Integ-VectorDB-Sample
     ```
 
-2. **Create a virtual environment**:
+2. **Create and activate a virtual environment**:
+
     ```sh
-    python -m venv venv
-    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+    python -m venv .venv
+    .venv\Scripts\Activate.ps1   # Windows PowerShell
+    # or: source .venv/bin/activate  # macOS/Linux
     ```
 
 3. **Install dependencies**:
+
     ```sh
     pip install -r requirements.txt
     ```
 
-4. **Set up environment variables**:
-    - Copy the [.env](http://_vscodecontentref_/13) file and update the values with your database and API credentials.
+4. **Configure environment variables** — create a `.env` file in the project root:
 
-5. The .env file
+    ```
+    AZURE_OPENAI_ENDPOINT="https://<your-openai>.openai.azure.com/"
+    AZURE_OPENAI_DEPLOYMENT_NAME="gpt-4o"
+    AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME="text-embedding-ada-002"
+    API_VERSION="2023-08-01-preview"
+    API_TYPE="azure"
 
-```
-AZURE_OPENAI_ENDPOINT="https://<>.openai.azure.com/"
-AZURE_OPENAI_API_KEY=""
-AZURE_OPENAI_DEPLOYMENT_NAME="gpt-4o"
-AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME="text-embedding-ada-002"
-API_VERSION="2023-08-01-preview"
-API_TYPE="azure"
-az_db_server = "<>.database.windows.net"
-az_db_database = "<>"
-az_db_username = "<>"
-az_db_password = "<>"
+    az_db_server="<your-server>.database.windows.net"
+    az_db_database="<your-database>"
 
+    ai_search_url="https://<your-search>.search.windows.net"
+    ai_index_name="contoso-motocorp-index"
+    ai_semantic_config="contoso-motocorp-config"
+    ```
 
-ai_search_url = "https://<>.search.windows.net"
-ai_search_key = "<>"
-ai_index_name = "contoso-motocorp-index"
-ai_semantic_config = "contoso-motocorp-config"
-```
+    > Authentication uses `DefaultAzureCredential` — no API keys or database passwords needed. Ensure your identity has the required RBAC roles on Azure OpenAI, Azure SQL, and Azure AI Search.
+
+5. **Set up the database** — run the SQL scripts in order:
+
+    1. `scripts/db-create.sql` — creates tables and inserts seed data
+    2. `scripts/create_service_schedule_sp.sql` — creates the `CreateServiceSchedule` procedure
+    3. `scripts/capture-service-rating.sql` — creates the `InsertServiceFeedback` procedure
+    4. `scripts/analyze_feedback_sp.sql` — creates the `AnalyzeFeedback` procedure
+    5. `scripts/get_embeddings_sp.sql` — creates the embedding generation procedure
+
+6. **Set up Azure AI Search** — upload the contents of `documents/heromotocorp-sample-understood.md` to an Azure AI Search index named `contoso-motocorp-index` with a semantic configuration named `contoso-motocorp-config`.
 
 ## Usage
 
 ### Running the Bot
 
-To run the bot application, execute the following command:
-
 ```sh
 python agent.py
 ```
 
-### Analyzing Feedback
-To analyze customer feedback, run:
+The bot greets the logged-in customer by name and presents available capabilities. Type your request in natural language — the supervisor agent will route to the appropriate specialist.
+
+### Feedback Explorer (Streamlit UI)
+
+An interactive UI for exploring service feedback using **vector similarity search** combined with **rating filters**:
+
+```sh
+streamlit run feedback_explorer.py
+```
+
+Features:
+- **Vector search** — enter a natural language sentiment query (e.g., "unhappy with cleanliness"), which gets embedded via Azure OpenAI and searched against the `feedback_vector` column using cosine distance
+- **Rating sliders** — filter by max rating across 5 dimensions (overall experience, quality of work, timeliness, politeness, cleanliness)
+- **Distance threshold** — control how similar results must be to the query
+- **Generated T-SQL** — view the exact query being executed
+- **Results grid** — browse results in an interactive data table
+
+### Vector Search (CLI)
+
+For scripted or command-line vector search on feedback:
+
+```sh
+python scripts/vector_feedback_search.py --query-text "poor service quality" --max-rating 3 --distance-threshold 0.5 --top 10
+```
+
+### Standalone Feedback Analysis
 
 ```sh
 python analyze_feedback.py
 ```
 
-### Vector Search with Managed Identity
-
-Use the new CLI flow to generate embeddings with Azure OpenAI and run vector similarity search in Azure SQL using managed identity.
-
-1. Activate virtual environment:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-2. Run vector search using the PowerShell wrapper:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\run-vector-search.ps1 -QueryText "timely delivery issue" -Top 10
-```
-
-3. Optional filters:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\run-vector-search.ps1 -QueryText "timely delivery issue" -MaxRating 3 -DistanceThreshold 0.5 -Top 10
-```
-
-4. Direct Python command (alternative):
-
-```powershell
-python scripts/vector_feedback_search.py --query-text "timely delivery issue" --max-rating 3 --distance-threshold 0.5 --top 10
-```
-
-Notes:
-- Run commands exactly as plain text in terminal (do not include markdown link formats like `[file](url)`).
-- The script reads configuration from `.env` and uses `DefaultAzureCredential` for both Azure OpenAI and Azure SQL.
-
-### Database Setup
-
-To set up the database, execute the SQL scripts in the scripts directory in the following order:
-
-- db-create.sql: Creates and populates the database tables.
-- create_service_schedule_sp.sql: Creates the CreateServiceSchedule stored procedure.
-- capture-service-rating.sql: Creates the InsertServiceFeedback stored procedure.
-- analyze_feedback_sp.sql: Creates the AnalyzeFeedback stored procedure.
-
-
-
-
-### Tools and Utilities
-#### Database Tools
-
-- fetch_customer_information: Retrieves customer information from the database
-- get_available_service_slots: Retrieves available service slots.
-- create_service_appointment_slot: Creates a service appointment slot.
-- store_service_feedback: Stores customer feedback for a service appointment.
-
-
-### Graph comprising the Agents
-
-agent.py -> Implements a full blown multi agent solution using `langGraph`. This has been adapted based on a similar sample in the Travel domain [here](https://langchain-ai.github.io/langgraph/tutorials/customer-support/customer-support/#conversation).Here the supervisor agents routes to the other agents, each of which are powered by an LLM and can make decisions of their own. They choose to use the different tools they have access to, can respond to the user directly and not have to go through the supervisor, when in a context in the conversation. Each of the Agents have a system prompt that determines their behavior and purpose.
-
-![Contoso Motocorp Service Bot](graph_bot_app_v2.png)
+Runs a predefined vector search query against the `Service_Feedback` table using the `AnalyzeFeedback` stored procedure.
